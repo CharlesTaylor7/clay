@@ -7,6 +7,8 @@
   , EmptyDataDecls
   , RankNTypes
   , ConstraintKinds
+  , QuantifiedConstraints
+
   , MultiParamTypeClasses
   #-}
 module Clay.Size
@@ -76,6 +78,7 @@ where
 
 import Data.Monoid
 import Data.Kind
+import Data.Coerce (coerce)
 import Prelude hiding (rem)
 import Data.Text (Text)
 
@@ -83,26 +86,30 @@ import Clay.Common
 import Clay.Property
 import Clay.Stylesheet
 
-
-class AnyConstraint
-class AnyConstraint => LengthConstraint
-class AnyConstraint => PercentageConstraint
-
 -- | Sizes can be given using a length unit (e.g. em, px).
-type LengthUnit = LengthConstraint
+data LengthUnit
 
 -- | Sizes can be given in percentages.
-type Percentage = PercentageConstraint
+data Percentage
 
 -- | When combining percentages with units using calc, we get a combination
-type AnyUnit = AnyConstraint
+data AnyUnit
 
-data Size (a :: Constraint)
+cast :: Size a -> Size AnyUnit
+cast = coerce
+
+type family AddUnits a b where
+  AddUnits LengthUnit LengthUnit = LengthUnit
+  AddUnits Percentage Percentage = PercentageUnit
+  AddUnits a b = AnyUnit
+
+
+data Size t
   = SimpleSize Text
-  | SumSize (Size a) (Size a)
-  | DiffSize (Size a) (Size a)
-  | MultSize Double (Size a)
-  | DivSize Double (Size a)
+  | SumSize (Size t) (Size t)
+  | DiffSize (Size t) (Size t)
+  | MultSize Double (Size t)
+  | DivSize Double (Size t)
   | OtherSize Value
   deriving Show
 
