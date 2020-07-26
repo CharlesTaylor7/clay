@@ -45,7 +45,7 @@ spec = do
     describe "list of sizes" $ do
       "{grid-template-columns:1em 20% auto}"
         `shouldRenderFrom`
-        gridTemplateColumns [em 1, pct 20 + fr 1, auto]
+        gridTemplateColumns [em 1, pct 20 @+@ fr 1, auto]
 
     describe "gridArea" $ do
       "{grid-area:header}"
