@@ -14,6 +14,9 @@ module Clay.Size
   Size
 , LengthUnit
 , Percentage
+, AnyUnit
+, IsLength
+, IsPercent
 , nil
 , unitless
 
@@ -90,11 +93,13 @@ data Percentage
 -- | When combining percentages with units using calc, we get a combination
 data AnyUnit
 
-class Length
-instance Length AnyUnit
-instance Length LengthUnit
+default IsLength LengthUnit
+class IsLength u
+instance IsLength AnyUnit
+instance IsLength LengthUnit
 
-class Percent
+default IsPercent Percentage
+class Percent u
 instance Percent AnyUnit
 instance Percent Percentage
 
@@ -135,7 +140,7 @@ nil = SimpleSize "0"
 unitless :: Double -> Size a
 unitless i = SimpleSize ((plain . unValue . value) i)
 
-cm, mm, inches, px, pt, pc :: Length a => Double -> Size a
+cm, mm, inches, px, pt, pc :: IsLength a => Double -> Size a
 
 -- | Size in centimeters.
 cm i = SimpleSize (cssDoubleText i <> "cm")
@@ -155,7 +160,7 @@ pt i = SimpleSize (cssDoubleText i <> "pt")
 -- | Size in picas (1pc = 12pt).
 pc i = SimpleSize (cssDoubleText i <> "pc")
 
-em, ex, rem, vw, vh, vmin, vmax, fr :: Length a => Double -> Size a
+em, ex, rem, vw, vh, vmin, vmax, fr :: IsLength a => Double -> Size a
 
 -- | Size in em's (computed cssDoubleText of the font-size).
 em i = SimpleSize (cssDoubleText i <> "em")
@@ -230,7 +235,7 @@ instance Fractional (Size Percentage) where
 type family SizeCombination sa sb where
   SizeCombination Percentage Percentage = Percentage
   SizeCombination LengthUnit LengthUnit = LengthUnit
-  SizeCombination a b = Combination
+  SizeCombination a b = AnyUnit
 
 -- | Plus operator to combine sizes into calc function
 infixl 6 @+@
