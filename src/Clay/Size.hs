@@ -6,6 +6,8 @@
   , StandaloneDeriving
   , TypeFamilies
   , EmptyDataDecls
+  , GADTs
+  , DataKinds
   #-}
 module Clay.Size
 (
@@ -84,31 +86,41 @@ import Clay.Stylesheet
 
 -------------------------------------------------------------------------------
 
--- | Sizes can be given using a length unit (e.g. em, px).
-data LengthUnit
-
--- | Sizes can be given in percentages.
-data Percentage
-
--- | When combining percentages with units using calc, we get a combination
--- | Any unit or combination of units
-data AnyUnit
+data Unit
+  = LengthUnit -- | Sizes can be given using a length unit (e.g. em, px).
+  | Percentage -- | Sizes can be given in percentages.
+  | AnyUnit  -- | Any unit or combination of units
 
 -- | Upcast a size unit
 upcast :: Size a -> Size AnyUnit
 upcast = coerce
 
-data Size a =
-  SimpleSize Text |
-  forall b c. SumSize (Size b) (Size c) |
-  forall b c. DiffSize (Size b) (Size c) |
-  forall b c. MinMaxSize (Size b) (Size c) |
-  forall b. FitContentSize (Size b) |
-  MultSize Double (Size a) |
-  DivSize Double (Size a) |
-  OtherSize Value
+-- | ultra terse Bool
+type T = True
+type F = False
+
+type family Or (b1 :: Bool) (b2 :: Bool) :: Bool where
+  Or F F = F
+  Or _ _ = True
+
+data Size
+  (a :: Unit)    -- ^ unit
+  (b :: Bool) -- ^ calc or not
+  (c :: Bool) -- ^ keyword or css function not allowed in Calc
+  where
+    SimpleSize :: Text -> Size a F F
+    SumSize        :: Size a t F -> Size b t F -> Size (SizeCombination a b) T F
+    DiffSize       :: Size a t F -> Size b t F -> Size (SizeCombination a b) T F
+    MultSize       :: Double -> Size a t F -> Size a T F
+    DivSize        :: Double -> Size a t F -> Size a T F
+    MinMaxSize     :: Size a t1 F -> Size b t1 F -> Size AnyUnit (Or t1 t2) T
+    FitContentSize :: Size a t F -> Size a t T
+    OtherSize      :: Value -> Size a F T
 
 deriving instance Show (Size a)
+
+calc :: Size a -> Size a
+calc = CalcSize
 
 sizeToText :: Size a -> Text
 sizeToText (SimpleSize txt) = txt
@@ -127,16 +139,18 @@ instance Val (Size a) where
   value s@(FitContentSize _) = Value $ Plain $ sizeToText s
   value s = Value $ Plain ("calc" <> sizeToText s)
 
--- Keywords
-instance Auto       (Size a) where auto       = OtherSize auto
-instance Inherit    (Size a) where inherit    = OtherSize inherit
-instance Initial    (Size a) where initial    = OtherSize initial
-instance Unset      (Size a) where unset      = OtherSize inherit
-instance None       (Size a) where none       = OtherSize none
-instance MinContent (Size a) where minContent = OtherSize minContent
-instance MaxContent (Size a) where maxContent = OtherSize maxContent
+type SizeKeyword a = Size a F T
 
-instance Other (Size a) where other a = OtherSize a
+-- Keywords
+instance Auto       (SizeKeyword a) where auto       = OtherSize auto
+instance Inherit    (SizeKeyword a) where inherit    = OtherSize inherit
+instance Initial    (SizeKeyword a) where initial    = OtherSize initial
+instance Unset      (SizeKeyword a) where unset      = OtherSize inherit
+instance None       (SizeKeyword a) where none       = OtherSize none
+instance MinContent (SizeKeyword a) where minContent = OtherSize minContent
+instance MaxContent (SizeKeyword a) where maxContent = OtherSize maxContent
+
+instance Other      (SizeKeyword a) where other a = OtherSize a
 
 -- | Zero size.
 nil :: Size a
@@ -204,33 +218,8 @@ minmax = MinMaxSize
 pct :: Double -> Size Percentage
 pct i = SimpleSize (cssDoubleText i <> "%")
 
-instance Num (Size LengthUnit) where
-  fromInteger = px . fromInteger
-  (+)    = error   "plus not implemented for Size"
-  (*)    = error  "times not implemented for Size"
-  abs    = error    "abs not implemented for Size"
-  signum = error "signum not implemented for Size"
-  negate = error "negate not implemented for Size"
-
-instance Fractional (Size LengthUnit) where
-  fromRational = px . fromRational
-  recip  = error  "recip not implemented for Size"
-
-instance Num (Size Percentage) where
-  fromInteger = pct . fromInteger
-  (+)    = error   "plus not implemented for Size"
-  (*)    = error  "times not implemented for Size"
-  abs    = error    "abs not implemented for Size"
-  signum = error "signum not implemented for Size"
-  negate = error "negate not implemented for Size"
-
-instance Fractional (Size Percentage) where
-  fromRational = pct . fromRational
-  recip  = error  "recip not implemented for Size"
-
 -- | Type family to define what is the result of a calc operation
-
-type family SizeCombination sa sb where
+type family SizeCombination (sa :: Unit) (sb :: Unit) where
   SizeCombination Percentage Percentage = Percentage
   SizeCombination LengthUnit LengthUnit = LengthUnit
   SizeCombination a b = AnyUnit
