@@ -11,7 +11,7 @@ module Clay.Grid
   , gridTemplateRows
   , gridTemplateColumns
   , GridTemplateSizes
-  , SomeSize(..)
+  --, SomeSize(..)
   , gridTemplateAreas
   , gridArea
   , blankGridArea
@@ -80,11 +80,6 @@ blankGridArea :: GridArea
 blankGridArea = GridArea "."
 
 -------------------------------------------------------------------------------
-data SomeSize = forall a. SomeSize { getSize :: Size a }
-
-instance Val SomeSize where
-  value (SomeSize size) = value size
-
 newtype GridTemplateSizes = GridTemplateSizes Value
   deriving (Val, None, Inherit, Initial, Unset)
 

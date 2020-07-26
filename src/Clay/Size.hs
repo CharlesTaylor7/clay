@@ -5,6 +5,10 @@
   , ExistentialQuantification
   , StandaloneDeriving
   , TypeFamilies
+  , DefaultSignatures
+  , MultiParamTypeClasses
+  , FlexibleContexts
+  , TypeApplications
   , EmptyDataDecls
   #-}
 module Clay.Size
@@ -14,6 +18,7 @@ module Clay.Size
   Size
 , LengthUnit
 , Percentage
+, SomeSize(..)
 , nil
 , unitless
 
@@ -80,7 +85,23 @@ import Clay.Property
 import Clay.Stylesheet
 
 -------------------------------------------------------------------------------
+-- | Existentially quantified Size
+data SomeSize = forall a. SomeSize { getSize :: Size a }
 
+instance Val SomeSize where
+  value (SomeSize size) = value size
+
+class IsSize a s where
+  fromSize :: Size a -> s
+
+instance {-# overlaps #-} Size a ~ s => IsSize a s where
+  fromSize = id
+-- dd(Size a)
+
+instance IsSize a SomeSize where
+  fromSize = SomeSize
+
+-------------------------------------------------------------------------------
 -- | Sizes can be given using a length unit (e.g. em, px).
 data LengthUnit
 
@@ -127,51 +148,57 @@ nil = SimpleSize "0"
 unitless :: Double -> Size a
 unitless i = SimpleSize ((plain . unValue . value) i)
 
-cm, mm, inches, px, pt, pc :: Double -> Size LengthUnit
+simpleSizeLength :: IsSize LengthUnit s => Text -> s
+simpleSizeLength = fromSize @LengthUnit . SimpleSize
+
+simpleSizePercentage :: IsSize Percentage s => Text -> s
+simpleSizePercentage = fromSize @Percentage . SimpleSize
+
+cm, mm, inches, px, pt, pc :: IsSize LengthUnit s => Double -> s
 
 -- | Size in centimeters.
-cm i = SimpleSize (cssDoubleText i <> "cm")
+cm i = simpleSizeLength (cssDoubleText i <> "cm")
 
 -- | Size in millimeters.
-mm i = SimpleSize (cssDoubleText i <> "mm")
+mm i = simpleSizeLength (cssDoubleText i <> "mm")
 
 -- | Size in inches (1in = 2.54 cm).
-inches i = SimpleSize (cssDoubleText i <> "in")
+inches i = simpleSizeLength (cssDoubleText i <> "in")
 
 -- | Size in pixels.
-px i = SimpleSize (cssDoubleText i <> "px")
+px i =  simpleSizeLength (cssDoubleText i <> "px")
 
 -- | Size in points (1pt = 1/72 of 1in).
-pt i = SimpleSize (cssDoubleText i <> "pt")
+pt i = simpleSizeLength (cssDoubleText i <> "pt")
 
 -- | Size in picas (1pc = 12pt).
-pc i = SimpleSize (cssDoubleText i <> "pc")
+pc i = simpleSizeLength (cssDoubleText i <> "pc")
 
-em, ex, rem, vw, vh, vmin, vmax, fr :: Double -> Size LengthUnit
+em, ex, rem, vw, vh, vmin, vmax, fr :: IsSize LengthUnit s => Double -> s
 
 -- | Size in em's (computed cssDoubleText of the font-size).
-em i = SimpleSize (cssDoubleText i <> "em")
+em i = simpleSizeLength (cssDoubleText i <> "em")
 
 -- | SimpleSize in ex'es (x-height of the first avaliable font).
-ex i = SimpleSize (cssDoubleText i <> "ex")
+ex i = simpleSizeLength (cssDoubleText i <> "ex")
 
 -- | SimpleSize in rem's (em's, but always relative to the root element).
-rem i = SimpleSize (cssDoubleText i <> "rem")
+rem i = simpleSizeLength (cssDoubleText i <> "rem")
 
 -- | SimpleSize in vw's (1vw = 1% of viewport width).
-vw i = SimpleSize (cssDoubleText i <> "vw")
+vw i = simpleSizeLength (cssDoubleText i <> "vw")
 
 -- | SimpleSize in vh's (1vh = 1% of viewport height).
-vh i = SimpleSize (cssDoubleText i <> "vh")
+vh i = simpleSizeLength (cssDoubleText i <> "vh")
 
 -- | SimpleSize in vmin's (the smaller of vw or vh).
-vmin i = SimpleSize (cssDoubleText i <> "vmin")
+vmin i = simpleSizeLength (cssDoubleText i <> "vmin")
 
 -- | SimpleSize in vmax's (the larger of vw or vh).
-vmax i = SimpleSize (cssDoubleText i <> "vmax")
+vmax i = simpleSizeLength (cssDoubleText i <> "vmax")
 
 -- | 'SimpleSize' in fr's (a fractional unit and 1fr is for 1 part of the available space in grid areas).
-fr i = SimpleSize (cssDoubleText i <> "fr")
+fr i = simpleSizeLength (cssDoubleText i <> "fr")
 
 -- | SimpleSize for the intrinsic preferred width.
 maxContent :: Size LengthUnit
@@ -191,7 +218,7 @@ fitContent = SimpleSize "fit-content"
 
 -- | SimpleSize in percents.
 pct :: Double -> Size Percentage
-pct i = SimpleSize (cssDoubleText i <> "%")
+pct i = simpleSizePercentage (cssDoubleText i <> "%")
 
 instance Num (Size LengthUnit) where
   fromInteger = px . fromInteger
