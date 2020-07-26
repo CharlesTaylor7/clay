@@ -91,6 +91,9 @@ data SomeSize = forall a. SomeSize { getSize :: Size a }
 instance Val SomeSize where
   value (SomeSize size) = value size
 
+instance Auto SomeSize where
+  auto = SomeSize auto
+
 class IsSize a s where
   fromSize :: Size a -> s
 
@@ -217,7 +220,7 @@ fitContent :: Size LengthUnit
 fitContent = SimpleSize "fit-content"
 
 -- | SimpleSize in percents.
-pct :: Double -> Size Percentage
+pct :: IsSize Percentage s => Double -> s
 pct i = simpleSizePercentage (cssDoubleText i <> "%")
 
 instance Num (Size LengthUnit) where
