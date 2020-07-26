@@ -94,14 +94,13 @@ instance Val SomeSize where
 instance Auto SomeSize where
   auto = SomeSize auto
 
-class IsSize a s where
+class IsSize s a where
   fromSize :: Size a -> s
 
-instance {-# overlaps #-} Size a ~ s => IsSize a s where
+instance {-# overlaps #-} Size a ~ s => IsSize s a where
   fromSize = id
--- dd(Size a)
 
-instance IsSize a SomeSize where
+instance IsSize SomeSize a where
   fromSize = SomeSize
 
 -------------------------------------------------------------------------------
@@ -151,13 +150,13 @@ nil = SimpleSize "0"
 unitless :: Double -> Size a
 unitless i = SimpleSize ((plain . unValue . value) i)
 
-simpleSizeLength :: IsSize LengthUnit s => Text -> s
-simpleSizeLength = fromSize @LengthUnit . SimpleSize
+simpleSizeLength :: IsSize s LengthUnit => Text -> s
+simpleSizeLength = fromSize @_ @LengthUnit . SimpleSize
 
-simpleSizePercentage :: IsSize Percentage s => Text -> s
-simpleSizePercentage = fromSize @Percentage . SimpleSize
+simpleSizePercentage :: IsSize s Percentage => Text -> s
+simpleSizePercentage = fromSize @_ @Percentage . SimpleSize
 
-cm, mm, inches, px, pt, pc :: IsSize LengthUnit s => Double -> s
+cm, mm, inches, px, pt, pc :: IsSize s LengthUnit => Double -> s
 
 -- | Size in centimeters.
 cm i = simpleSizeLength (cssDoubleText i <> "cm")
@@ -177,7 +176,7 @@ pt i = simpleSizeLength (cssDoubleText i <> "pt")
 -- | Size in picas (1pc = 12pt).
 pc i = simpleSizeLength (cssDoubleText i <> "pc")
 
-em, ex, rem, vw, vh, vmin, vmax, fr :: IsSize LengthUnit s => Double -> s
+em, ex, rem, vw, vh, vmin, vmax, fr :: IsSize s LengthUnit => Double -> s
 
 -- | Size in em's (computed cssDoubleText of the font-size).
 em i = simpleSizeLength (cssDoubleText i <> "em")
@@ -220,7 +219,7 @@ fitContent :: Size LengthUnit
 fitContent = SimpleSize "fit-content"
 
 -- | SimpleSize in percents.
-pct :: IsSize Percentage s => Double -> s
+pct :: IsSize s Percentage => Double -> s
 pct i = simpleSizePercentage (cssDoubleText i <> "%")
 
 instance Num (Size LengthUnit) where
