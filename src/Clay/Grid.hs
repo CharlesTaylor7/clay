@@ -84,7 +84,7 @@ newtype GridTemplateSizes = GridTemplateSizes Value
   deriving (Val, None, Inherit, Initial, Unset)
 
 instance IsList GridTemplateSizes where
-  type Item GridTemplateSizes = SomeSize
+  type Item GridTemplateSizes = Size AnyUnit
   toList = error ""
   fromList = GridTemplateSizes . noCommas
 

@@ -3,13 +3,11 @@
   , GeneralizedNewtypeDeriving
   , FlexibleInstances
   , ExistentialQuantification
-  , StandaloneDeriving
   , TypeFamilies
-  , DefaultSignatures
-  , MultiParamTypeClasses
-  , FlexibleContexts
-  , TypeApplications
   , EmptyDataDecls
+  , RankNTypes
+  , ConstraintKinds
+  , MultiParamTypeClasses
   #-}
 module Clay.Size
 (
@@ -18,7 +16,7 @@ module Clay.Size
   Size
 , LengthUnit
 , Percentage
-, SomeSize(..)
+, AnyUnit
 , nil
 , unitless
 
@@ -77,6 +75,7 @@ module Clay.Size
 where
 
 import Data.Monoid
+import Data.Kind
 import Prelude hiding (rem)
 import Data.Text (Text)
 
@@ -84,44 +83,29 @@ import Clay.Common
 import Clay.Property
 import Clay.Stylesheet
 
--------------------------------------------------------------------------------
--- | Existentially quantified Size
-data SomeSize = forall a. SomeSize { getSize :: Size a }
 
-instance Val SomeSize where
-  value (SomeSize size) = value size
+class AnyConstraint
+class AnyConstraint => LengthConstraint
+class AnyConstraint => PercentageConstraint
 
-instance Auto SomeSize where
-  auto = SomeSize auto
-
-class IsSize s a where
-  fromSize :: Size a -> s
-
-instance {-# overlaps #-} Size a ~ s => IsSize s a where
-  fromSize = id
-
-instance IsSize SomeSize a where
-  fromSize = SomeSize
-
--------------------------------------------------------------------------------
 -- | Sizes can be given using a length unit (e.g. em, px).
-data LengthUnit
+type LengthUnit = LengthConstraint
 
 -- | Sizes can be given in percentages.
-data Percentage
+type Percentage = PercentageConstraint
 
 -- | When combining percentages with units using calc, we get a combination
-data Combination
+type AnyUnit = AnyConstraint
 
-data Size a =
-  SimpleSize Text |
-  forall b c. SumSize (Size b) (Size c) |
-  forall b c. DiffSize (Size b) (Size c) |
-  MultSize Double (Size a) |
-  DivSize Double (Size a) |
-  OtherSize Value
+data Size (a :: Constraint)
+  = SimpleSize Text
+  | SumSize (Size a) (Size a)
+  | DiffSize (Size a) (Size a)
+  | MultSize Double (Size a)
+  | DivSize Double (Size a)
+  | OtherSize Value
+  deriving Show
 
-deriving instance Show (Size a)
 
 sizeToText :: Size a -> Text
 sizeToText (SimpleSize txt) = txt
@@ -150,57 +134,51 @@ nil = SimpleSize "0"
 unitless :: Double -> Size a
 unitless i = SimpleSize ((plain . unValue . value) i)
 
-simpleSizeLength :: IsSize s LengthUnit => Text -> s
-simpleSizeLength = fromSize @_ @LengthUnit . SimpleSize
-
-simpleSizePercentage :: IsSize s Percentage => Text -> s
-simpleSizePercentage = fromSize @_ @Percentage . SimpleSize
-
-cm, mm, inches, px, pt, pc :: IsSize s LengthUnit => Double -> s
+cm, mm, inches, px, pt, pc :: Double -> Size LengthUnit
 
 -- | Size in centimeters.
-cm i = simpleSizeLength (cssDoubleText i <> "cm")
+cm i = SimpleSize (cssDoubleText i <> "cm")
 
 -- | Size in millimeters.
-mm i = simpleSizeLength (cssDoubleText i <> "mm")
+mm i = SimpleSize (cssDoubleText i <> "mm")
 
 -- | Size in inches (1in = 2.54 cm).
-inches i = simpleSizeLength (cssDoubleText i <> "in")
+inches i = SimpleSize (cssDoubleText i <> "in")
 
 -- | Size in pixels.
-px i =  simpleSizeLength (cssDoubleText i <> "px")
+px i =  SimpleSize (cssDoubleText i <> "px")
 
 -- | Size in points (1pt = 1/72 of 1in).
-pt i = simpleSizeLength (cssDoubleText i <> "pt")
+pt i = SimpleSize (cssDoubleText i <> "pt")
 
 -- | Size in picas (1pc = 12pt).
-pc i = simpleSizeLength (cssDoubleText i <> "pc")
+pc i = SimpleSize (cssDoubleText i <> "pc")
 
-em, ex, rem, vw, vh, vmin, vmax, fr :: IsSize s LengthUnit => Double -> s
+em, ex, rem, vw, vh, vmin, vmax, fr :: Double -> Size LengthUnit
 
 -- | Size in em's (computed cssDoubleText of the font-size).
-em i = simpleSizeLength (cssDoubleText i <> "em")
+em i = SimpleSize (cssDoubleText i <> "em")
 
 -- | SimpleSize in ex'es (x-height of the first avaliable font).
-ex i = simpleSizeLength (cssDoubleText i <> "ex")
+ex i = SimpleSize (cssDoubleText i <> "ex")
 
 -- | SimpleSize in rem's (em's, but always relative to the root element).
-rem i = simpleSizeLength (cssDoubleText i <> "rem")
+rem i = SimpleSize (cssDoubleText i <> "rem")
 
 -- | SimpleSize in vw's (1vw = 1% of viewport width).
-vw i = simpleSizeLength (cssDoubleText i <> "vw")
+vw i = SimpleSize (cssDoubleText i <> "vw")
 
 -- | SimpleSize in vh's (1vh = 1% of viewport height).
-vh i = simpleSizeLength (cssDoubleText i <> "vh")
+vh i = SimpleSize (cssDoubleText i <> "vh")
 
 -- | SimpleSize in vmin's (the smaller of vw or vh).
-vmin i = simpleSizeLength (cssDoubleText i <> "vmin")
+vmin i = SimpleSize (cssDoubleText i <> "vmin")
 
 -- | SimpleSize in vmax's (the larger of vw or vh).
-vmax i = simpleSizeLength (cssDoubleText i <> "vmax")
+vmax i = SimpleSize (cssDoubleText i <> "vmax")
 
 -- | 'SimpleSize' in fr's (a fractional unit and 1fr is for 1 part of the available space in grid areas).
-fr i = simpleSizeLength (cssDoubleText i <> "fr")
+fr i = SimpleSize (cssDoubleText i <> "fr")
 
 -- | SimpleSize for the intrinsic preferred width.
 maxContent :: Size LengthUnit
@@ -219,9 +197,10 @@ fitContent :: Size LengthUnit
 fitContent = SimpleSize "fit-content"
 
 -- | SimpleSize in percents.
-pct :: IsSize s Percentage => Double -> s
-pct i = simpleSizePercentage (cssDoubleText i <> "%")
+pct :: Double -> Size Percentage
+pct i = SimpleSize (cssDoubleText i <> "%")
 
+{--
 instance Num (Size LengthUnit) where
   fromInteger = px . fromInteger
   (+)    = error   "plus not implemented for Size"
@@ -245,22 +224,16 @@ instance Num (Size Percentage) where
 instance Fractional (Size Percentage) where
   fromRational = pct . fromRational
   recip  = error  "recip not implemented for Size"
-
--- | Type family to define what is the result of a calc operation
-
-type family SizeCombination sa sb where
-  SizeCombination Percentage Percentage = Percentage
-  SizeCombination LengthUnit LengthUnit = LengthUnit
-  SizeCombination a b = Combination
+--}
 
 -- | Plus operator to combine sizes into calc function
 infixl 6 @+@
-(@+@) :: Size a -> Size b -> Size (SizeCombination a b)
+(@+@) :: Size a -> Size a -> Size a
 a @+@ b = SumSize a b
 
 -- | Minus operator to combine sizes into calc function
 infixl 6 @-@
-(@-@) :: Size a -> Size b -> Size (SizeCombination a b)
+(@-@) :: Size a -> Size a -> Size a
 a @-@ b = DiffSize a b
 
 -- | Times operator to combine sizes into calc function
