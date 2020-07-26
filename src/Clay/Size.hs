@@ -96,12 +96,55 @@ instance Auto SomeSize where
 
 class IsSize s a where
   fromSize :: Size a -> s
+  (@+@) :: s -> s -> s
+  (@-@) :: s -> s -> s
+
+  (*@):: Double -> s -> s
+  (*@) = flip (@*)
+
+  (@*):: s -> Double -> s
+  (@*) = flip (*@)
+
+  (@/):: s -> s -> s
+  {-# MINIMAL fromSize, (@+@), (@-@), ((*@) | (@*)), (@/) -#}
 
 instance {-# overlaps #-} Size a ~ s => IsSize s a where
   fromSize = id
 
 instance IsSize SomeSize a where
   fromSize = SomeSize
+
+-- | Type family to define what is the result of a calc operation
+type family SizeCombination sa sb where
+  SizeCombination Percentage Percentage = Percentage
+  SizeCombination LengthUnit LengthUnit = LengthUnit
+  SizeCombination a b = Combination
+
+-- | Plus operator to combine sizes into calc function
+infixl 6 @+@
+(@+@) :: Size a -> Size b -> Size (SizeCombination a b)
+a @+@ b = SumSize a b
+
+-- | Minus operator to combine sizes into calc function
+infixl 6 @-@
+(@-@) :: Size a -> Size b -> Size (SizeCombination a b)
+a @-@ b = DiffSize a b
+
+-- | Times operator to combine sizes into calc function
+infixl 7 *@
+(*@) :: Double -> Size a -> Size a
+a *@ b = MultSize a b
+
+-- | Reversed times operator to combine sizes into calc function
+infixl 7 @*
+(@*) :: Size a -> Double -> Size a
+a @* b = MultSize b a
+
+-- | Division operator to combine sizes into calc function
+infixl 7 @/
+(@/) :: Size a -> Double -> Size a
+a @/ b = DivSize b a
+
 
 -------------------------------------------------------------------------------
 -- | Sizes can be given using a length unit (e.g. em, px).
@@ -245,39 +288,6 @@ instance Num (Size Percentage) where
 instance Fractional (Size Percentage) where
   fromRational = pct . fromRational
   recip  = error  "recip not implemented for Size"
-
--- | Type family to define what is the result of a calc operation
-
-type family SizeCombination sa sb where
-  SizeCombination Percentage Percentage = Percentage
-  SizeCombination LengthUnit LengthUnit = LengthUnit
-  SizeCombination a b = Combination
-
--- | Plus operator to combine sizes into calc function
-infixl 6 @+@
-(@+@) :: Size a -> Size b -> Size (SizeCombination a b)
-a @+@ b = SumSize a b
-
--- | Minus operator to combine sizes into calc function
-infixl 6 @-@
-(@-@) :: Size a -> Size b -> Size (SizeCombination a b)
-a @-@ b = DiffSize a b
-
--- | Times operator to combine sizes into calc function
-infixl 7 *@
-(*@) :: Double -> Size a -> Size a
-a *@ b = MultSize a b
-
--- | Reversed times operator to combine sizes into calc function
-infixl 7 @*
-(@*) :: Size a -> Double -> Size a
-a @* b = MultSize b a
-
--- | Division operator to combine sizes into calc function
-infixl 7 @/
-(@/) :: Size a -> Double -> Size a
-a @/ b = DivSize b a
-
 -------------------------------------------------------------------------------
 
 sym :: (a -> a -> a -> a -> Css) -> a -> Css
