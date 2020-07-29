@@ -1,4 +1,8 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE
+    OverloadedStrings
+  , FlexibleInstances
+  , UndecidableInstances
+  #-}
 
 -- | A bunch of type classes representing common values shared between multiple
 -- CSS properties, like `Auto`, `Inherit`, `None`, `Normal` and several more.
@@ -30,6 +34,7 @@ class MinContent a where minContent :: a
 class MaxContent a where maxContent :: a
 class Row        a where row        :: a
 class Column     a where column     :: a
+class Span       a where span       :: a
 
 -- | The other type class is used to escape from the type safety introduced by
 -- embedding CSS properties into the typed world of Clay. `Other` allows you to
@@ -84,6 +89,8 @@ instance MinContent Value where minContent = minContentValue
 instance MaxContent Value where maxContent = maxContentValue
 instance Row        Value where row        = rowValue
 instance Column     Value where column     = columnValue
+
+instance {-# overlappable #-} IsString a => Span a where span = "span"
 
 -------------------------------------------------------------------------------
 

@@ -37,8 +37,6 @@ module Clay.Grid
   , GridTemplateAreas
   , GridTemplateNamedAreas
   , InvalidGridTemplateNamedAreas(..)
-  -- re exports
-  , These(..)
   )
   where
 
@@ -46,14 +44,13 @@ import Clay.Common
 import Clay.Property
 import Clay.Size
 import Clay.Stylesheet
-import Clay.Elements (span)
 
 import Prelude hiding (span)
 import Data.String (IsString)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Coerce (coerce)
-import Data.These
+import Data.These (These(..))
 import GHC.Exts (IsList(..))
 import Control.Exception (Exception(..), throw)
 import Control.Monad (when)
@@ -159,6 +156,9 @@ gridColumnEnd = key "grid-column-end"
 gridLocation :: IsSpan -> These Integer GridArea -> GridLocation
 gridLocation isSpan = GridLocation_Data . GridLocationData isSpan
 
+instance Span IsSpan where span = Span
+
+noSpan ::
 data IsSpan = Span | NoSpan
   deriving (Show, Eq)
 

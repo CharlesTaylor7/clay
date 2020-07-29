@@ -10,7 +10,7 @@ import Clay.Selector
 -- | Special cases, these items occur both as an HTML tag and an HTML
 -- attribute. We keep them polymorph.
 
-abbr, cite, command, data_, form, label, span, style, title :: IsString a => a
+abbr, cite, command, data_, form, label, style, title :: IsString a => a
 
 abbr = "abbr"
 cite = "cite"
@@ -18,7 +18,6 @@ command = "command"
 data_ = "data"
 form = "form"
 label = "label"
-span = "span"
 style = "style"
 title = "title"
 
