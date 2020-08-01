@@ -12,6 +12,8 @@
   , UndecidableInstances
   , QuantifiedConstraints
   , FlexibleInstances
+  , DeriveAnyClass
+  , DerivingStrategies
   #-}
 -- | Implementation of <https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Grid_Layout>.
 module Clay.Grid
@@ -41,7 +43,7 @@ module Clay.Grid
   , gridLocation
   , IsSpan(..)
   , gridTemplateAreas
-  , GridTemplateAreas
+  , IsGridTemplateAreas
   -- re exports
   , These(..)
   )
@@ -54,6 +56,8 @@ import Clay.Stylesheet
 import Clay.Elements (span)
 
 import Prelude hiding (span)
+import Control.Monad (when)
+import Control.Exception (Exception(..), throw)
 import Data.String (IsString)
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -219,8 +223,6 @@ newtype KeywordGridTemplateAreas = KeywordGridTemplateAreas Value
 class Val a => IsGridTemplateAreas a
 -- | Any keyword value allowed for grid-template-areas.
 instance IsGridTemplateAreas KeywordGridTemplateAreas
--- | Compile time checked Grid template areas. A single row as a tuple.
-instance forall n v. StaticGridTemplateRow n v => IsGridTemplateAreas v
 -- | Compile time checked Grid template areas. Accepts a tuple of tuples
 instance forall m n v w. StaticGridTemplateAreas m n v w => IsGridTemplateAreas v
 -- | Run time checked Grid template areas. A list of lists
@@ -229,12 +231,9 @@ instance IsGridTemplateAreas DynamicGridTemplateAreas
 instance {-# OVERLAPS #-} forall m n v w. StaticGridTemplateAreas m n v w => Val v where
   value = gridTemplateAreasToValue . map Sized.toList . Sized.toList
 
-instance {-# OVERLAPS #-} forall n v. StaticOneRowGridTemplateAreas n v => Val v where
-  value = gridTemplateAreasToValue . pure . Sized.toList
-
 type PositiveNat n = (KnownNat n, CmpNat n 0 ~ 'GT)
 
-type StaticRowGridTemplateArea numCols inputRow =
+type StaticOneRowGridTemplateAreas numCols inputRow =
   ( PositiveNat numCols
   , IndexedListLiterals inputRow numCols GridArea
   )
@@ -257,4 +256,42 @@ gridTemplateAreasToValue areas =
       Text.intercalate "\n" $
       fmap convertRow $
       rows
+
+-- have to create a newtype to override the Val instance for lists
+newtype DynamicGridTemplateAreas = DynamicGridTemplateAreas [[GridArea]]
+
+instance Val DynamicGridTemplateAreas where
+  value (DynamicGridTemplateAreas areas) = gridTemplateAreasToValue areas
+
+  -- | 'toList will throw when your grid template areas are invalid
+instance IsList DynamicGridTemplateAreas where
+  type Item DynamicGridTemplateAreas = [GridArea]
+  toList (DynamicGridTemplateAreas areas) = areas
+  fromList = either throw id . mkGridTemplateNamedAreas
+
+-- | Smart constructor for 'DynamicGridTemplateAreas
+mkGridTemplateNamedAreas :: [[GridArea]] -> Either InvalidGridTemplateAreas DynamicGridTemplateAreas
+mkGridTemplateNamedAreas rows = do
+    let
+      counts = fmap length (coerce rows :: [[GridArea]])
+      longest = maximum counts
+
+    when (null rows) $
+      Left GridTemplateAreas_Empty
+
+    when (any (== 0) counts)  $
+      Left GridTemplateAreas_EmptyRow
+
+    when (any (/= longest) counts)  $
+      Left GridTemplateAreas_NotRectangular
+
+    Right $ DynamicGridTemplateAreas rows
+
+-- | Failure modes for the smart constructor
+data InvalidGridTemplateAreas
+    = GridTemplateAreas_Empty
+    | GridTemplateAreas_EmptyRow
+    | GridTemplateAreas_NotRectangular
+    deriving stock (Eq, Show)
+    deriving anyclass (Exception)
 
