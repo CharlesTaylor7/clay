@@ -76,7 +76,10 @@ Library
     base  >= 4.11 && < 5,
     mtl   >= 1    && < 2.3,
     text  >= 0.11 && < 1.3,
-    these < 1.2
+    these < 1.2,
+    vector,
+    vector-sized,
+    indexed-list-literals
   GHC-Options: -Wall -Wcompat
 
 Test-Suite Test-Clay
@@ -88,6 +91,9 @@ Test-Suite Test-Clay
     mtl                  >= 1     && < 2.3,
     text                 >= 0.11  && < 1.3,
     these                < 1.2,
+    vector,
+    vector-sized,
+    indexed-list-literals,
     hspec                >= 2.2.0 && < 2.8,
     hspec-discover       >= 2.2.0 && < 2.8
   GHC-Options: -Wall -Wcompat

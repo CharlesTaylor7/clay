@@ -5,6 +5,13 @@
   , RankNTypes
   , ExistentialQuantification
   , PatternSynonyms
+  , DataKinds
+  , TypeOperators
+  , ConstraintKinds
+  , FlexibleContexts
+  , UndecidableInstances
+  , QuantifiedConstraints
+  , FlexibleInstances
   #-}
 -- | Implementation of <https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Grid_Layout>.
 module Clay.Grid
@@ -35,8 +42,6 @@ module Clay.Grid
   , IsSpan(..)
   , gridTemplateAreas
   , GridTemplateAreas
-  , GridTemplateNamedAreas
-  , InvalidGridTemplateNamedAreas(..)
   -- re exports
   , These(..)
   )
@@ -53,10 +58,11 @@ import Data.String (IsString)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Coerce (coerce)
-import Data.These
+import Data.These (These(..))
+import Data.IndexedListLiterals (IndexedListLiterals)
+import qualified Data.IndexedListLiterals as Sized
 import GHC.Exts (IsList(..))
-import Control.Exception (Exception(..), throw)
-import Control.Monad (when)
+import GHC.TypeLits (KnownNat, CmpNat)
 
 
 -- | Property sets the gaps (gutters) between rows and columns.
@@ -204,25 +210,44 @@ instance Num GridLocation where
 -------------------------------------------------------------------------------
 
 -- | Property defines the template for grid layout
-gridTemplateAreas :: GridTemplateAreas -> Css
+gridTemplateAreas :: IsGridTemplateAreas areas => areas -> Css
 gridTemplateAreas = key "grid-template-areas"
 
-newtype GridTemplateAreas = GridTemplateAreas Value
+newtype KeywordGridTemplateAreas = KeywordGridTemplateAreas Value
   deriving (Val, None, Inherit, Initial, Unset)
 
-instance IsList GridTemplateAreas where
-  type Item GridTemplateAreas = [GridArea]
-  toList = error "toList GridTemplateAreas is not defined"
-  fromList = GridTemplateAreas . value . fromList'
-    where
-      fromList' :: [Item GridTemplateNamedAreas] -> GridTemplateNamedAreas
-      fromList' = fromList
+class Val a => IsGridTemplateAreas a
+-- | Any keyword value allowed for grid-template-areas.
+instance IsGridTemplateAreas KeywordGridTemplateAreas
+-- | Compile time checked Grid template areas. A single row as a tuple.
+instance forall n v. StaticGridTemplateRow n v => IsGridTemplateAreas v
+-- | Compile time checked Grid template areas. Accepts a tuple of tuples
+instance forall m n v w. StaticGridTemplateAreas m n v w => IsGridTemplateAreas v
+-- | Run time checked Grid template areas. A list of lists
+instance IsGridTemplateAreas DynamicGridTemplateAreas
 
--- have to create a newtype to override the Val instance for lists
-newtype GridTemplateNamedAreas = GridTemplateNamedAreas { unGridTemplateNamedAreas :: [[GridArea]] }
+instance {-# OVERLAPS #-} forall m n v w. StaticGridTemplateAreas m n v w => Val v where
+  value = gridTemplateAreasToValue . map Sized.toList . Sized.toList
 
-instance Val GridTemplateNamedAreas where
-  value areas =
+instance {-# OVERLAPS #-} forall n v. StaticOneRowGridTemplateAreas n v => Val v where
+  value = gridTemplateAreasToValue . pure . Sized.toList
+
+type PositiveNat n = (KnownNat n, CmpNat n 0 ~ 'GT)
+
+type StaticRowGridTemplateArea numCols inputRow =
+  ( PositiveNat numCols
+  , IndexedListLiterals inputRow numCols GridArea
+  )
+
+type StaticGridTemplateAreas numCols numRows inputRows inputRow =
+  ( PositiveNat numCols
+  , PositiveNat numRows
+  , IndexedListLiterals inputRow numCols GridArea
+  , IndexedListLiterals inputRows numRows inputRow
+  )
+
+gridTemplateAreasToValue :: [[GridArea]] -> Value
+gridTemplateAreasToValue areas =
     let
       rows = coerce areas :: [[Text]]
       wrapInParens text = "\"" <> text <> "\""
@@ -233,35 +258,3 @@ instance Val GridTemplateNamedAreas where
       fmap convertRow $
       rows
 
--- | toList will throw when your grid template areas are invalid
-instance IsList GridTemplateNamedAreas where
-  type Item GridTemplateNamedAreas = [GridArea]
-  toList = unGridTemplateNamedAreas
-  fromList = either throw id . mkGridTemplateNamedAreas
-
--- | Smart constructor for GridTemplateNamedAreas
-mkGridTemplateNamedAreas :: [[GridArea]] -> Either InvalidGridTemplateNamedAreas GridTemplateNamedAreas
-mkGridTemplateNamedAreas rows = do
-    let
-      counts = fmap length (coerce rows :: [[GridArea]])
-      longest = maximum counts
-
-    when (null rows) $
-      Left GridTemplateNamedAreas_Empty
-
-    when (any (== 0) counts)  $
-      Left GridTemplateNamedAreas_EmptyRow
-
-    when (any (/= longest) counts)  $
-      Left GridTemplateNamedAreas_NotRectangular
-
-    Right $ GridTemplateNamedAreas rows
-
--- | Failure modes for the smart constructor
-data InvalidGridTemplateNamedAreas
-  = GridTemplateNamedAreas_Empty
-  | GridTemplateNamedAreas_EmptyRow
-  | GridTemplateNamedAreas_NotRectangular
-  deriving (Eq, Show)
-
-instance Exception InvalidGridTemplateNamedAreas
