@@ -125,41 +125,69 @@ spec = do
         `shouldRenderFrom`
         gridTemplateAreas unset
 
-    describe "mozilla example" $ do
-      let
-        area_a = "a"
-        area_b = "b"
-        area_c = "c"
-        area_blank = blankGridArea
+    describe "statically sized - compile time checked" $ do
+      describe "mozilla example" $ do
+        let
+          area_a = "a"
+          area_b = "b"
+          area_c = "c"
+          area_blank = blankGridArea
 
-      "{grid-template-areas:\"a a .\"\n\"a a .\"\n\". b c\"}"
-        `shouldRenderFrom`
-        gridTemplateAreas
-          [ [ area_a, area_a, area_blank]
-          , [ area_a, area_a, area_blank]
-          , [ area_blank, area_b, area_c]
-          ]
-    describe "non rectangular template areas should error" $ do
-      let
-        area_a = "a"
-        area_b = "b"
-        area_c = "c"
-        area_blank = blankGridArea
+        "{grid-template-areas:\"a a .\"\n\"a a .\"\n\". b c\"}"
+          `shouldRenderFrom`
+          gridTemplateAreas
+            ( ( area_a, area_a, area_blank)
+            , ( area_a, area_a, area_blank )
+            , ( area_blank, area_b, area_c )
+            )
+      describe "single row" $ do
+        let
+          area_a = "a"
+          area_b = "b"
+          area_c = "c"
+          area_blank = blankGridArea
 
-      GridTemplateNamedAreas_NotRectangular
-        `shouldErrorFromRender`
-        gridTemplateAreas
-          [ [ area_blank]                 -- length 1
-          , [ area_a, area_blank]         -- length 2
-          , [ area_blank, area_b, area_c] -- length 3
-          ]
+        "{grid-template-areas:\"a a .\"\n\"a a .\"\n\". b c\"}"
+          `shouldRenderFrom`
+          gridTemplateAreas
+            ( only ( area_a, area_a, area_blank) )
 
-    describe "empty template should error" $ do
-      GridTemplateNamedAreas_Empty
-        `shouldErrorFromRender`
-        gridTemplateAreas []
+    describe "dynamically sized - runtime checked" $ do
+      describe "mozilla example" $ do
+        let
+          area_a = "a"
+          area_b = "b"
+          area_c = "c"
+          area_blank = blankGridArea
 
-    describe "template with empty row(s) should error" $ do
-      GridTemplateNamedAreas_EmptyRow
-        `shouldErrorFromRender`
-        gridTemplateAreas [[], []]
+        "{grid-template-areas:\"a a .\"\n\"a a .\"\n\". b c\"}"
+          `shouldRenderFrom`
+          gridTemplateAreas
+            [ [ area_a, area_a, area_blank]
+            , [ area_a, area_a, area_blank]
+            , [ area_blank, area_b, area_c]
+            ]
+      describe "non rectangular template areas should error" $ do
+        let
+          area_a = "a"
+          area_b = "b"
+          area_c = "c"
+          area_blank = blankGridArea
+
+        GridTemplateAreas_NotRectangular
+          `shouldErrorFromRender`
+          gridTemplateAreas
+            [ [ area_blank]                 -- length 1
+            , [ area_a, area_blank]         -- length 2
+            , [ area_blank, area_b, area_c] -- length 3
+            ]
+
+      describe "empty template should error" $ do
+        GridTemplateAreas_Empty
+          `shouldErrorFromRender`
+          gridTemplateAreas []
+
+      describe "template with empty row(s) should error" $ do
+        GridTemplateAreas_EmptyRow
+          `shouldErrorFromRender`
+          gridTemplateAreas [[], []]

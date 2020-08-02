@@ -43,7 +43,9 @@ module Clay.Grid
   , gridLocation
   , IsSpan(..)
   , gridTemplateAreas
+  , only
   , IsGridTemplateAreas
+  , InvalidGridTemplateAreas(..)
   -- re exports
   , These(..)
   )
@@ -63,7 +65,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Coerce (coerce)
 import Data.These (These(..))
-import Data.IndexedListLiterals (IndexedListLiterals)
+import Data.IndexedListLiterals (IndexedListLiterals, Only)
 import qualified Data.IndexedListLiterals as Sized
 import GHC.Exts (IsList(..))
 import GHC.TypeLits (KnownNat, CmpNat)
@@ -217,6 +219,10 @@ instance Num GridLocation where
 gridTemplateAreas :: IsGridTemplateAreas areas => areas -> Css
 gridTemplateAreas = key "grid-template-areas"
 
+-- | 'Only represents a tuple of size 1. Use this for grid-template-areas with just 1 row.
+only :: a -> Only a
+only = Sized.Only
+
 newtype KeywordGridTemplateAreas = KeywordGridTemplateAreas Value
   deriving (Val, None, Inherit, Initial, Unset)
 
@@ -232,11 +238,6 @@ instance {-# OVERLAPS #-} forall m n v w. StaticGridTemplateAreas m n v w => Val
   value = gridTemplateAreasToValue . map Sized.toList . Sized.toList
 
 type PositiveNat n = (KnownNat n, CmpNat n 0 ~ 'GT)
-
-type StaticOneRowGridTemplateAreas numCols inputRow =
-  ( PositiveNat numCols
-  , IndexedListLiterals inputRow numCols GridArea
-  )
 
 type StaticGridTemplateAreas numCols numRows inputRows inputRow =
   ( PositiveNat numCols
